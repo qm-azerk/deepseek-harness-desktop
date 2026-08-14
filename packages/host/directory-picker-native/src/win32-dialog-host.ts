@@ -30,16 +30,24 @@ export function spawnDialogWorker(data: Win32DialogWorkerData): ReturnType<typeo
     ...(process.versions.electron === undefined ? {} : { ELECTRON_RUN_AS_NODE: '1' }),
   }
   const stdio: StdioOptions = ['ignore', 'inherit', 'inherit', 'ipc']
+  // Node forwards this to the spawned worker on Windows, but ForkOptions in
+  // the current type declarations does not expose the inherited spawn option.
+  const windowsForkOptions = { windowsHide: true } as unknown as NonNullable<Parameters<typeof fork>[2]>
   /* v8 ignore next 3 -- the built-output arm: tests always run unbuilt (src/) */
   if (!import.meta.url.endsWith('.ts')) {
-    return fork(fileURLToPath(new URL('./worker.cjs', import.meta.url)), [], { execPath: process.execPath, env, stdio, windowsHide: true })
+    return fork(fileURLToPath(new URL('./worker.cjs', import.meta.url)), [], {
+      execPath: process.execPath,
+      env,
+      stdio,
+      ...windowsForkOptions,
+    })
   }
   return fork(fileURLToPath(new URL('./win32-dialog-worker.ts', import.meta.url)), [], {
     execPath: process.execPath,
     execArgv: ['--import', import.meta.resolve('tsx/esm')],
     env,
     stdio,
-    windowsHide: true,
+    ...windowsForkOptions,
   })
 }
 
