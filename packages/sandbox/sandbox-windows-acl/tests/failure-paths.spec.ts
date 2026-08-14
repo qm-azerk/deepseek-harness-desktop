@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import koffi from 'koffi'
 
-import { PROCESS_INFORMATION, getTempPath } from '../src/ffi.ts'
+import { PROCESS_INFORMATION, STARTUPINFOW, getTempPath } from '../src/ffi.ts'
 import type { NativePtr, Win32Bindings } from '../src/ffi.ts'
 import { Win32Error } from '../src/errors.ts'
 import { drainPipe, spawnSandboxed, spawnSandboxedInherited, waitForExit } from '../src/spawn.ts'
@@ -85,6 +85,24 @@ describe('spawn failure paths close their handles', () => {
     expect((caught as Win32Error).win32Code).toBe(5)
     expect(closeHandle).toHaveBeenCalledTimes(6)
     expect(closed).toEqual([1n, 2n, 3n, 4n, 5n, 6n])
+  })
+
+  it('hides the initial window without using a console creation flag', () => {
+    const { api } = pipeFailureApi()
+    const create = api.createProcessAsUserW as ReturnType<typeof vi.fn>
+    create.mockImplementation((
+      _token: unknown, _application: unknown, _commandLine: unknown, _processAttributes: unknown,
+      _threadAttributes: unknown, _inheritHandles: unknown, creationFlags: unknown, _environment: unknown,
+      _cwd: unknown, startupInfo: NativePtr,
+    ) => {
+      expect(creationFlags).toBe(0)
+      expect(koffi.decode(startupInfo, STARTUPINFOW)).toMatchObject({
+        dwFlags: abi.STARTF_USESTDHANDLES | abi.STARTF_USESHOWWINDOW,
+        wShowWindow: abi.SW_HIDE,
+      })
+      return 0
+    })
+    expect(() => spawnSandboxed(api, token, { command: 'probe.exe', args: [], cwd: 'C:\\' })).toThrow(Win32Error)
   })
 
   it('spawnSandboxedInherited closes thread, process, and kill-on-close job before throwing when ResumeThread fails', () => {

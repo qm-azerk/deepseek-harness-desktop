@@ -113,7 +113,10 @@ export function spawnSandboxed(
   const startupInfo = allocStartupInfo()
   encodeStartupInfo(startupInfo, {
     cb: abi.STARTUPINFOW_SIZE,
-    dwFlags: abi.STARTF_USESTDHANDLES,
+    // Unlike CREATE_NO_WINDOW, this only controls the initial ShowWindow
+    // state and remains compatible with the restricted token.
+    dwFlags: abi.STARTF_USESTDHANDLES | abi.STARTF_USESHOWWINDOW,
+    wShowWindow: abi.SW_HIDE,
     hStdInput: stdIn.read,
     hStdOutput: stdOut.write,
     hStdError: stdErr.write,
@@ -297,7 +300,10 @@ export function spawnSandboxedInherited(
   const startupInfo = allocStartupInfo()
   encodeStartupInfo(startupInfo, {
     cb: abi.STARTUPINFOW_SIZE,
-    dwFlags: abi.STARTF_USESTDHANDLES,
+    // Preserve the runner's pipe inheritance while keeping its pwsh child
+    // from presenting a transient console window on GUI hosts.
+    dwFlags: abi.STARTF_USESTDHANDLES | abi.STARTF_USESHOWWINDOW,
+    wShowWindow: abi.SW_HIDE,
     hStdInput: stdIn,
     hStdOutput: stdOut,
     hStdError: stdErr,

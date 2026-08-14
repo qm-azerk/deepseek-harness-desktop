@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
   "description": "Windows desktop installer for DeepSeek Harness",
-  "version": "0.1.0-rc.13",
+  "version": "0.1.0-rc.16",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {
