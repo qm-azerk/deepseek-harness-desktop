@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, Menu } = require('electron')
+const { app, BrowserWindow, dialog, Menu, Tray } = require('electron')
 const { spawn, execFile } = require('node:child_process')
 const { randomBytes } = require('node:crypto')
 const { access, mkdir, readFile, rename, stat, writeFile } = require('node:fs/promises')
@@ -10,8 +10,10 @@ const { promisify } = require('node:util')
 const HARNESS_PORT = 3080
 let harnessProcess
 let mainWindow
+let tray
 let directoryPickerBridge
 let directoryPickerBridgeUrl
+let isQuitting = false
 const directoryPickerBridgeToken = randomBytes(32).toString('hex')
 const execFileAsync = promisify(execFile)
 
@@ -183,6 +185,24 @@ function stopHarness() {
   harnessProcess = undefined
 }
 
+function showMainWindow() {
+  if (!mainWindow) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function createTray() {
+  tray = new Tray(path.join(__dirname, '..', 'assets', 'icon.png'))
+  tray.setToolTip('DeepSeek Harness')
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Open DeepSeek Harness', click: showMainWindow },
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() },
+  ]))
+  tray.on('click', showMainWindow)
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -198,6 +218,11 @@ async function createWindow() {
   })
   mainWindow.setMenuBarVisibility(false)
   mainWindow.once('ready-to-show', () => mainWindow.show())
+  mainWindow.on('close', event => {
+    if (isQuitting) return
+    event.preventDefault()
+    mainWindow.hide()
+  })
   mainWindow.on('closed', () => { mainWindow = undefined })
   await mainWindow.loadFile(path.join(__dirname, 'splash.html'))
 
@@ -213,13 +238,13 @@ if (!hasSingleInstanceLock) {
 } else {
   Menu.setApplicationMenu(null)
   app.on('second-instance', () => {
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.show()
-    mainWindow.focus()
+    showMainWindow()
   })
 
-  app.whenReady().then(createWindow).catch(async error => {
+  app.whenReady().then(async () => {
+    createTray()
+    await createWindow()
+  }).catch(async error => {
     stopHarness()
     await dialog.showMessageBox({
       type: 'error',
@@ -231,10 +256,12 @@ if (!hasSingleInstanceLock) {
   })
 }
 
-app.on('window-all-closed', () => app.quit())
 app.on('before-quit', () => {
+  isQuitting = true
   stopHarness()
   directoryPickerBridge?.close()
   directoryPickerBridge = undefined
   directoryPickerBridgeUrl = undefined
+  tray?.destroy()
+  tray = undefined
 })
