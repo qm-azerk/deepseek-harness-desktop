@@ -39,6 +39,25 @@ function rethrowIfAborted(signal: AbortSignal, error: unknown): void {
   if (signal.aborted) throw error
 }
 
+async function pickElectronDirectory(signal: AbortSignal): Promise<string | null | undefined> {
+  const url = process.env.DSH_ELECTRON_DIRECTORY_PICKER_URL
+  if (url === undefined || url === '') return undefined
+  const token = process.env.DSH_ELECTRON_DIRECTORY_PICKER_TOKEN
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: token === undefined || token === '' ? {} : { 'x-dsh-directory-picker-token': token },
+    signal,
+  })
+  if (!response.ok) throw new Error(`Electron directory picker returned HTTP ${response.status}`)
+  const result: unknown = await response.json()
+  if (typeof result !== 'object' || result === null || !('path' in result)) {
+    throw new Error('Electron directory picker returned an invalid response')
+  }
+  const selected = result.path
+  if (selected === null || typeof selected === 'string') return selected
+  throw new Error('Electron directory picker returned an invalid path')
+}
+
 /**
  * Open the platform directory picker.
  * @param signal - caller/connection lifetime; abort terminates the native command.
@@ -67,6 +86,8 @@ export async function pickNativeDirectory(
   }
 
   if (platform === 'win32') {
+    const electronPath = await pickElectronDirectory(signal)
+    if (electronPath !== undefined) return electronPath
     // The koffi-backed IFileOpenDialog child process — the modern picker with
     // per-monitor-v2 DPI and abort support. koffi is a packaged dependency
     // whose availability the install guarantees, so there is no fallback

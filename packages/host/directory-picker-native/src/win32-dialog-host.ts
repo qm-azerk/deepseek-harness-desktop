@@ -7,7 +7,7 @@
  * surface instead.
  */
 
-import { spawn, type StdioOptions } from 'node:child_process'
+import { fork, type StdioOptions } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import type { Win32DialogWorkerData } from './win32-dialog-worker.ts'
 
@@ -20,14 +20,27 @@ import type { Win32DialogWorkerData } from './win32-dialog-worker.ts'
  * @param data - the child payload (dialog title).
  * @returns the spawned child process.
  */
-export function spawnDialogWorker(data: Win32DialogWorkerData): ReturnType<typeof spawn> {
-  const env = { ...process.env, DSH_DIALOG_TITLE: data.title }
+export function spawnDialogWorker(data: Win32DialogWorkerData): ReturnType<typeof fork> {
+  const env = {
+    ...process.env,
+    DSH_DIALOG_TITLE: data.title,
+    // Electron clears this launch flag for its main process, but its child
+    // worker must receive it to execute the CJS entry as Node instead of
+    // opening a second Electron application instance.
+    ...(process.versions.electron === undefined ? {} : { ELECTRON_RUN_AS_NODE: '1' }),
+  }
   const stdio: StdioOptions = ['ignore', 'inherit', 'inherit', 'ipc']
   /* v8 ignore next 3 -- the built-output arm: tests always run unbuilt (src/) */
   if (!import.meta.url.endsWith('.ts')) {
-    return spawn(process.execPath, [fileURLToPath(new URL('./worker.cjs', import.meta.url))], { env, stdio, windowsHide: true })
+    return fork(fileURLToPath(new URL('./worker.cjs', import.meta.url)), [], { execPath: process.execPath, env, stdio, windowsHide: true })
   }
-  return spawn(process.execPath, ['--import', import.meta.resolve('tsx/esm'), fileURLToPath(new URL('./win32-dialog-worker.ts', import.meta.url))], { env, stdio, windowsHide: true })
+  return fork(fileURLToPath(new URL('./win32-dialog-worker.ts', import.meta.url)), [], {
+    execPath: process.execPath,
+    execArgv: ['--import', import.meta.resolve('tsx/esm')],
+    env,
+    stdio,
+    windowsHide: true,
+  })
 }
 
 export { closeThreadWindows } from './win32-dialog-bindings.ts'

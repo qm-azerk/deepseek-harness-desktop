@@ -1,0 +1,57 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "description": "Windows desktop installer for DeepSeek Harness",
+  "version": "0.1.0-rc.13",
+  "private": true,
+  "main": "src/main.cjs",
+  "scripts": {
+    "prepare-runtime": "node scripts/prepare-runtime.mjs",
+    "generate-icon": "node scripts/generate-icon.cjs",
+    "package": "pnpm --workspace-root run build && pnpm run prepare-runtime && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "37.10.3",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.deepseek.harness",
+    "productName": "DeepSeek Harness",
+    "electronDist": "./node_modules/electron/dist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**",
+      "assets/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "harness-runtime.tar.gz",
+        "to": "harness-runtime.tar.gz"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DeepSeek Harness"
+    },
+    "artifactName": "DeepSeek-Harness-Setup-${version}.${ext}"
+  }
+}
